@@ -2,17 +2,31 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>stink</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 50px;
-        }
-    </style>
+    <title>Latest Video from maxi74x1</title>
 </head>
 <body>
-    <h1>fuck you callum</h1>
+    <h1>Latest Video from maxi74x1</h1>
+    <div id="video-container"></div>
+
+    <script>
+        const apiKey = 'AIzaSyBs-B60NUEQ8b-5LYxM4OqFYlHdcFDWxRY';
+        const channelId = 'UCPs-W0eZnwsy4bkCrGsr70w';
+        const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=1&order=date&type=video&key=${apiKey}`;
+
+        fetch(apiUrl)
+            .then(response => response.json())
+            .then(data => {
+                const videoId = data.items[0].id.videoId;
+                const videoTitle = data.items[0].snippet.title;
+                const videoDescription = data.items[0].snippet.description;
+                const videoContainer = document.getElementById('video-container');
+                videoContainer.innerHTML = `
+                    <h2>${videoTitle}</h2>
+                    <iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>
+                    <p>${videoDescription}</p>
+                `;
+            })
+            .catch(error => console.error('Error fetching video:', error));
+    </script>
 </body>
 </html>
