@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi Audio Visualizer - Final Version</title>
+    <style>
+
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+        body { background-color: #000; color: #fff; font-family: sans-serif; position: relative; }
+        canvas#mainCanvas { display: block; }
+
+
+        .ui-element {
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        #controlsContainer {
+            transition: transform 0.4s ease-in-out, opacity 0.5s ease-in-out;
+        }
+
+        #playButton {
+            transition: background-color 0.2s ease, opacity 0.5s ease-in-out;
+        }
+
+        #info { position: absolute; top: 10px; width: 100%; text-align: center; z-index: 100; display: block; }
+        #audioInputLabel { cursor: pointer; padding: 8px 15px; background-color: #333; border: 1px solid #555; border-radius: 5px; display: inline-block; margin: 0 10px; }
+        #audioInputLabel:hover { background-color: #555; }
+        #audioInput { opacity: 0; position: absolute; z-index: -1; }
+        #status { display: inline-block; margin: 0 10px; vertical-align: middle; }
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.5em; display: none; z-index: 105; background-color: rgba(0, 0, 0, 0.7); padding: 15px 25px; border-radius: 8px;}
+
+        #menuButton, #settingsButton { position: absolute; top: 10px; font-size: 24px; background: #222; border: 1px solid #444; color: #eee; padding: 5px 10px; cursor: pointer; z-index: 102; border-radius: 4px; }
+        #menuButton { left: 10px; }
+        #settingsButton { left: 60px;  }
+        #menuButton:hover, #settingsButton:hover { background: #444; }
+
+        #visualizerMenu, #settingsPanel, #presetAudioPopup { position: absolute; top: 50px; background: rgba(40, 40, 40, 0.9); border: 1px solid #555; border-radius: 5px; padding: 15px; z-index: 101;  display: none; min-width: 250px; max-height: calc(100vh - 70px); overflow-y: auto; }
+        #visualizerMenu { left: 10px; opacity: 1;  }
+        #settingsPanel { left: 10px; opacity: 1;  }
+
+        #settingsPanel h4 { margin-top: 0; margin-bottom: 15px; text-align: center; border-bottom: 1px solid #666; padding-bottom: 10px;}
+        #settingsPanel .settings-section { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #555;}
+        #settingsPanel .settings-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        #settingsPanel h5 { margin-top: 0; margin-bottom: 10px; text-align: center; color: #bbb; font-size: 0.95em;}
+        #settingsPanel > div > div { margin-bottom: 15px; }
+        #settingsPanel label { display: block; margin-bottom: 5px; font-size: 0.9em; }
+        #settingsPanel input[type="checkbox"] + label, #settingsPanel select + label { display: inline-block; margin-left: 5px; vertical-align: middle; cursor: pointer; }
+        #settingsPanel input[type="checkbox"], #settingsPanel select { vertical-align: middle; cursor: pointer; }
+        #settingsPanel select { background: #333; color: #eee; border: 1px solid #555; padding: 3px 5px; border-radius: 3px; margin-left: 5px;}
+        #settingsPanel input[type="range"] { width: 100%; cursor: pointer; }
+        #settingsPanel input[type="color"] { width: 50px; height: 25px; padding: 0 2px; border: 1px solid #555; cursor: pointer; vertical-align: middle; margin-left: 5px; background: none; }
+        #settingsPanel .setting-value { font-weight: bold; margin-left: 8px; font-family: monospace; display: inline-block; min-width: 35px; text-align: right;}
+        #settingsPanel .color-setting { display: flex; align-items: center; justify-content: space-between; }
+        #settingsPanel small { color: #aaa; display: block; margin-top: 5px; }
+
+        #playButton { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 1.5em; background-color: rgba(0, 180, 0, 0.7); color: white; border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 10px; cursor: pointer; z-index: 104; opacity: 1; display: none; box-shadow: 0 0 15px rgba(0, 255, 0, 0.5); }
+        #playButton:hover { background-color: rgba(0, 220, 0, 0.8); }
+
+        #controlsContainer { position: absolute; bottom: 0; left: 0; width: 100%; height: 80px; background: rgba(10, 10, 10, 0.9); display: flex; align-items: center; padding: 5px 15px; box-sizing: border-box; z-index: 110; transform: translateY(100%); opacity: 1; pointer-events: none; }
+        #controlsContainer.visible { transform: translateY(0); pointer-events: auto; }
+
+        #waveformCanvas { flex-grow: 1; height: 60px; cursor: pointer; background-color: rgba(30, 30, 30, 0.5); border-radius: 3px; margin-right: 15px; }
+        #timeDisplay { font-family: monospace; font-size: 1em; color: #ccc; min-width: 120px; text-align: right; user-select: none; }
+
+
+        .hint { position: absolute; background-color: rgba(0, 0, 0, 0.75); color: #eee; padding: 8px 15px; border-radius: 5px; font-size: 0.9em; z-index: 115; pointer-events: none; opacity: 0; }
+        #waveformHint { bottom: 85px; left: 50%; transform: translateX(-50%); opacity: 1; transition: opacity 1s ease-in-out; }
+         #controlsContainer.visible + #waveformHint, body:has(#controlsContainer.visible) #waveformHint { opacity: 0; transition-delay: 0s; }
+        #orthoHint, #oscilloscopeWarningHint { top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+        #orthoHint.visible, #oscilloscopeWarningHint.visible { opacity: 1; pointer-events: auto; }
+        #autoHideHint { top: 15px; right: 15px; opacity: 1; transition: opacity 1s ease-in-out 1s; z-index: 120; }
+        #autoHideHint.fade-out { opacity: 0; }
+
+
+
+        body.ui-hidden .ui-element {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+         body.ui-hidden #controlsContainer {
+            transform: translateY(100%) !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        body.ui-hidden #visualizerMenu, body.ui-hidden #settingsPanel, body.ui-hidden #presetAudioPopup {
+             display: none !important;
+        }
+
+    </style>
+</head>
+<body>
+
+    <button id="menuButton" class="ui-element">☰</button>
+    <button id="settingsButton" class="ui-element">⚙️</button>
+
+
+    <div id="visualizerMenu" class="ui-element">
+        <h4>Visualizers</h4>
+        <ul>
+            <li><button data-mode="sphere">Sphere Points</button></li>
+            <li><button data-mode="oscilloscope">Oscilloscope (Waveform)</button></li>
+            <li><button data-mode="xyScope">XY Scope (L/R Music)</button></li>
+            <hr style="border-color: #555; margin: 10px 0;">
+            <li><button id="presetAudioButton">Try Sample Tracks</button></li>
+        </ul>
+    </div>
+
+
+    <div id="settingsPanel" class="ui-element">
+        <h4>Settings</h4>
+        <div class="settings-section" id="sphereSettingsSection" style="display: none;">
+            <h5>Sphere Visualizer</h5>
+            <div><label for="sphereDetailSlider">Point Detail:</label><input type="range" id="sphereDetailSlider" min="4" max="32" step="1"><span id="sphereDetailValue" class="setting-value"></span></div>
+            <div class="color-setting"><label for="sphereColorInput">Point/Line Color:</label><input type="color" id="sphereColorInput"></div>
+            <div><input type="checkbox" id="sphereLinesToggle"><label for="sphereLinesToggle">Draw Lines</label></div>
+        </div>
+        <div class="settings-section" id="xyScopeSettingsSection" style="display: none;">
+            <h5>XY Scope</h5>
+            <div><label for="scaleSlider">Scale:</label><input type="range" id="scaleSlider" min="1" max="50" step="0.5"><span id="scaleValue" class="setting-value"></span></div>
+            <div><label for="smoothingSlider">Analyser Smoothing:</label><input type="range" id="smoothingSlider" min="0" max="0.9" step="0.01"><span id="smoothingValue" class="setting-value"></span></div>
+            <div><label for="lengthSlider">Line Length (Points):</label><input type="range" id="lengthSlider" min="10" max="4096" step="1"><span id="lengthValue" class="setting-value"></span><small><i>Tip: Reducing length can improve line stability.</i></small></div>
+            <div class="color-setting"><label for="lineColorInput">Line Color:</label><input type="color" id="lineColorInput"></div>
+        </div>
+        <div class="settings-section">
+            <h5>Camera</h5>
+            <div><label for="cameraViewSelect">View Mode:</label><select id="cameraViewSelect"><option value="perspective" selected>Perspective</option><option value="orthographic">Orthographic</option></select></div>
+        </div>
+        <div class="settings-section">
+            <h5>Post-Processing Effects</h5>
+            <div><input type="checkbox" id="bloomToggle"><label for="bloomToggle">Bloom</label></div>
+            <div><label for="bloomStrengthSlider">Bloom Strength:</label><input type="range" id="bloomStrengthSlider" min="0" max="3" step="0.05"><span id="bloomStrengthValue" class="setting-value"></span></div>
+            <div><label for="bloomRadiusSlider">Bloom Radius:</label><input type="range" id="bloomRadiusSlider" min="0" max="1" step="0.01"><span id="bloomRadiusValue" class="setting-value"></span></div>
+            <div><label for="bloomThresholdSlider">Bloom Threshold:</label><input type="range" id="bloomThresholdSlider" min="0" max="1" step="0.01"><span id="bloomThresholdValue" class="setting-value"></span></div>
+            <hr style="border-color: #444; margin: 15px 0;">
+            <div><input type="checkbox" id="smaaToggle"><label for="smaaToggle">Anti-Aliasing (SMAA)</label><small>(Smoother edges, higher GPU cost)</small></div>
+            <small><i>Note: More effects = higher GPU usage!</i></small>
+        </div>
+    </div>
+
+    <div id="presetAudioPopup" class="ui-element">
+        <h4 style="margin-top: 0; margin-bottom: 15px;">Try These Tracks</h4>
+        <div id="presetAudioList"></div>
+        <button id="closePresetPopup" style="margin-top: 20px; padding: 6px 12px; background: #222; border: 1px solid #444; color: #eee; border-radius: 5px; cursor: pointer;">Close</button>
+    </div>
+
+
+    <div id="info" class="ui-element">
+        <label id="audioInputLabel" for="audioInput">Upload Audio</label>
+        <input type="file" id="audioInput" accept="audio/*">
+        <span id="status">Upload audio or try sample tracks.</span>
+    </div>
+
+
+    <div id="loading">Loading Audio...</div>
+
+
+    <button id="playButton" class="ui-element">Play</button>
+
+
+    <div id="container"></div>
+
+
+    <div id="controlsContainer" class="ui-element">
+        <canvas id="waveformCanvas"></canvas>
+        <div id="timeDisplay">00:00 / 00:00</div>
+    </div>
+
+
+    <div id="waveformHint" class="hint ui-element">Hover near bottom to skip ahead (click waveform)</div>
+    <div id="orthoHint" class="hint ui-element">Orthographic view can jitter at high frequencies!</div>
+    <div id="oscilloscopeWarningHint" class="hint ui-element">Warning: XY Scope mode can be jittery and laggy,<br>especially with complex audio.</div>
+    <div id="autoHideHint" class="hint ui-element">UI hides if mouse leaves window for 2s</div>
+
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+
+
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+
+
+        let scene, camera, orthoCamera, activeCamera, renderer, audioContext, bufferSource = null, controls;
+        let analyser, frequencyData, timeData;
+        let analyserY, timeDataY;
+        let splitterNode;
+        let currentVisualizerMode = 'sphere';
+        let activeVisualizerObjects = [];
+        let sphereVisualObject, originalPositions;
+        let oscilloscopeLines = [];
+        let xyScopeLine;
+        let isAudioReadyToPlay = false;
+        let decodedAudioBuffer = null;
+        let isPlaying = false;
+        let startTime = 0; let startOffset = 0;
+        let waveformData = null; let waveformCanvas, waveformCtx; let lastDrawTime = -1;
+        let isControlsVisible = false;
+        let composer;
+        let renderPass, bloomPass, smaaPass;
+        const bloomParams = { strength: 1.2, radius: 0.6, threshold: 0.8, enabled: true };
+        let smaaEnabled = true;
+        let orthoHintTimeout = null;
+        let oscilloscopeWarningTimeout = null;
+        let uiFadeTimeout = null;
+        let waveformHintDismissed = false;
+
+
+        const SPHERE_RADIUS = 5; const SPHERE_POINT_SIZE = 0.15;
+        const SPHERE_ANALYSER_SMOOTHING = 0.6; const MAX_SPHERE_DISPLACEMENT = 3;
+        let SPHERE_POINT_DETAIL = 12; let SPHERE_POINT_COLOR = '#00ffcc'; let SPHERE_DRAW_LINES = false;
+        const OSC_LINE_COUNT = 1; const OSC_WIDTH_SCALE = 15; const OSC_HEIGHT_SCALE = 5;
+        const OSC_ANALYSER_SMOOTHING = 0; const FFT_SIZE = 1024;
+        let OSC_XY_SCALE = 15; const OSC_XY_FFT_SIZE = 8192; let OSC_XY_ANALYSER_SMOOTHING = 0.1;
+        const OSC_XY_MAX_SLIDER_LENGTH = 4096; let OSC_XY_LENGTH = OSC_XY_MAX_SLIDER_LENGTH; let OSC_XY_COLOR = '#00ff00';
+        let CAMERA_VIEW_MODE = 'perspective';
+
+
+        const container = document.getElementById('container'); const fileInput = document.getElementById('audioInput'); const statusElement = document.getElementById('status'); const loadingElement = document.getElementById('loading'); const menuButton = document.getElementById('menuButton'); const visualizerMenu = document.getElementById('visualizerMenu'); const menuButtons = visualizerMenu.querySelectorAll('button[data-mode]'); const playButton = document.getElementById('playButton'); const settingsButton = document.getElementById('settingsButton'); const settingsPanel = document.getElementById('settingsPanel'); const sphereSettingsSection = document.getElementById('sphereSettingsSection'); const xyScopeSettingsSection = document.getElementById('xyScopeSettingsSection'); const scaleSlider = document.getElementById('scaleSlider'); const scaleValueSpan = document.getElementById('scaleValue'); const smoothingSlider = document.getElementById('smoothingSlider'); const smoothingValueSpan = document.getElementById('smoothingValue'); const lengthSlider = document.getElementById('lengthSlider'); const lengthValueSpan = document.getElementById('lengthValue'); const lineColorInput = document.getElementById('lineColorInput'); const sphereDetailSlider = document.getElementById('sphereDetailSlider'); const sphereDetailValue = document.getElementById('sphereDetailValue'); const sphereColorInput = document.getElementById('sphereColorInput'); const sphereLinesToggle = document.getElementById('sphereLinesToggle'); const cameraViewSelect = document.getElementById('cameraViewSelect'); const bloomToggle = document.getElementById('bloomToggle'); const bloomStrengthSlider = document.getElementById('bloomStrengthSlider'); const bloomStrengthValue = document.getElementById('bloomStrengthValue'); const bloomRadiusSlider = document.getElementById('bloomRadiusSlider'); const bloomRadiusValue = document.getElementById('bloomRadiusValue'); const bloomThresholdSlider = document.getElementById('bloomThresholdSlider'); const bloomThresholdValue = document.getElementById('bloomThresholdValue'); const smaaToggle = document.getElementById('smaaToggle'); const controlsContainer = document.getElementById('controlsContainer'); waveformCanvas = document.getElementById('waveformCanvas'); const timeDisplay = document.getElementById('timeDisplay');
+        const waveformHint = document.getElementById('waveformHint');
+        const orthoHint = document.getElementById('orthoHint');
+        const oscilloscopeWarningHint = document.getElementById('oscilloscopeWarningHint');
+        const autoHideHint = document.getElementById('autoHideHint');
+        const presetAudioButton = document.getElementById('presetAudioButton');
+        const presetAudioPopup = document.getElementById('presetAudioPopup');
+        const presetAudioList = document.getElementById('presetAudioList');
+        const closePresetPopup = document.getElementById('closePresetPopup');
+
+
+        function init3D() {
+             scene = new THREE.Scene();
+             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+             camera.position.z = 20;
+             const aspect = window.innerWidth / window.innerHeight;
+             const frustumSize = 30;
+             orthoCamera = new THREE.OrthographicCamera(frustumSize * aspect / -2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / -2, 0.1, 1000);
+             orthoCamera.position.z = 20;
+             activeCamera = camera;
+             renderer = new THREE.WebGLRenderer({ antialias: false });
+             renderer.domElement.id = 'mainCanvas';
+             renderer.setSize(window.innerWidth, window.innerHeight);
+             renderer.setPixelRatio(window.devicePixelRatio);
+             renderer.setClearColor(0x000000);
+             renderer.outputColorSpace = THREE.SRGBColorSpace;
+             renderer.toneMapping = THREE.ACESFilmicToneMapping;
+             renderer.toneMappingExposure = 1.0;
+             container.appendChild(renderer.domElement);
+             controls = new OrbitControls(activeCamera, renderer.domElement);
+             controls.enableDamping = true;
+             controls.dampingFactor = 0.05;
+             controls.minDistance = 2;
+             controls.maxDistance = 50;
+             composer = new EffectComposer(renderer);
+             composer.setPixelRatio(window.devicePixelRatio);
+             composer.setSize(window.innerWidth, window.innerHeight);
+             renderPass = new RenderPass(scene, activeCamera);
+             composer.addPass(renderPass);
+             bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), bloomParams.strength, bloomParams.radius, bloomParams.threshold);
+             bloomPass.enabled = bloomParams.enabled;
+             composer.addPass(bloomPass);
+             smaaPass = new SMAAPass(window.innerWidth * renderer.getPixelRatio(), window.innerHeight * renderer.getPixelRatio());
+             smaaPass.enabled = smaaEnabled;
+             composer.addPass(smaaPass);
+             window.addEventListener('resize', onWindowResize, false);
+         }
+
+
+        function initAudioContext() {
+            try {
+                if (audioContext && audioContext.state !== 'closed') {
+                    stopPlayback();
+                    audioContext.close().then(() => console.log("Previous AudioContext closed."));
+                }
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log("AudioContext initialized/reinitialized.");
+                createAnalysisNodes();
+                return true;
+            } catch (e) {
+                console.error("Error initializing Web Audio API:", e);
+                statusElement.textContent = "Web Audio API Error.";
+                return false;
+            }
+        }
+
+         function createAnalysisNodes() {
+            if (!audioContext) return;
+            try {
+
+                if (splitterNode) splitterNode.disconnect();
+                if (analyser) analyser.disconnect();
+                if (analyserY) analyserY.disconnect();
+
+                splitterNode = audioContext.createChannelSplitter(2);
+                analyser = audioContext.createAnalyser();
+                analyserY = audioContext.createAnalyser();
+
+
+                splitterNode.connect(analyser, 0);
+                splitterNode.connect(analyserY, 1);
+
+
+                analyser.fftSize = FFT_SIZE;
+                analyserY.fftSize = OSC_XY_FFT_SIZE;
+                frequencyData = new Uint8Array(analyser.frequencyBinCount);
+                timeData = new Uint8Array(analyser.fftSize);
+                timeDataY = new Uint8Array(analyserY.fftSize);
+
+                console.log("Analysis nodes created/recreated.");
+            } catch (e) {
+                console.error("Error creating analysis nodes:", e);
+                splitterNode = analyser = analyserY = null;
+            }
+         }
+
+
+        function loadAndDecodeAudio(fileOrUrl) {
+            return new Promise((resolve, reject) => {
+                if (!audioContext || audioContext.state === 'closed') {
+                    if (!initAudioContext()) {
+                        reject(new Error("Audio context failed to initialize."));
+                        return;
+                    }
+                }
+
+
+                stopPlayback();
+                bufferSource = null;
+                decodedAudioBuffer = null;
+                isAudioReadyToPlay = false;
+                isPlaying = false;
+                waveformData = null;
+                startOffset = 0;
+                if (playButton) playButton.style.display = 'none';
+                if (controlsContainer) controlsContainer.classList.remove('visible');
+                isControlsVisible = false;
+                if (waveformHint && !waveformHintDismissed) waveformHint.style.opacity = '1';
+                if (timeDisplay) timeDisplay.textContent = '00:00 / 00:00';
+                if (waveformCtx) waveformCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
+
+                loadingElement.style.display = 'block';
+                playButton.style.display = 'none';
+
+                const decode = (arrayBuffer, sourceName) => {
+                     loadingElement.textContent = 'Decoding Audio...';
+                     audioContext.decodeAudioData(arrayBuffer)
+                        .then(buffer => {
+                            decodedAudioBuffer = buffer;
+                            isAudioReadyToPlay = true;
+                            loadingElement.style.display = 'none';
+                            playButton.style.display = 'block';
+                            statusElement.textContent = `Ready: ${sourceName}`;
+                            console.log(`Audio decoded: ${sourceName}, Channels: ${buffer.numberOfChannels}, Length: ${buffer.duration.toFixed(2)}s`);
+                            generateWaveformData(decodedAudioBuffer);
+                            timeDisplay.textContent = `00:00 / ${formatTime(decodedAudioBuffer.duration)}`;
+                            resolve();
+                        })
+                        .catch(err => {
+                            console.error('Error decoding audio data:', err);
+                            loadingElement.style.display = 'none';
+                            statusElement.textContent = 'Failed to decode audio.';
+                            reject(new Error('Failed to decode audio file.'));
+                        });
+                };
+
+                if (typeof fileOrUrl === 'string') {
+                     loadingElement.textContent = 'Fetching Audio...';
+                     fetch(fileOrUrl)
+                        .then(response => {
+                            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                            return response.arrayBuffer();
+                        })
+                        .then(arrayBuffer => {
+                             const fileName = fileOrUrl.substring(fileOrUrl.lastIndexOf('/') + 1);
+                             decode(arrayBuffer, fileName);
+                        })
+                        .catch(err => {
+                            console.error('Error fetching or processing preset audio:', err);
+                            loadingElement.style.display = 'none';
+                            statusElement.textContent = 'Failed to load preset.';
+                            reject(err);
+                        });
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                         decode(event.target.result, fileOrUrl.name);
+                    };
+                    reader.onerror = (err) => {
+                        loadingElement.style.display = 'none';
+                        statusElement.textContent = 'Error reading file.';
+                        reject(new Error('Error reading file.'));
+                    };
+                    reader.readAsArrayBuffer(fileOrUrl);
+                    loadingElement.textContent = 'Reading File...';
+                }
+            });
+        }
+
+
+
+        function stopPlayback() {
+            if (bufferSource) {
+                try {
+                    bufferSource.onended = null;
+                    bufferSource.stop(0);
+                } catch (e) {
+
+                }
+                try {
+                    bufferSource.disconnect();
+                 } catch (e) {
+
+                 }
+                bufferSource = null;
+            }
+            isPlaying = false;
+
+         }
+
+
+         function startPlayback(offset = 0) {
+            if (!decodedAudioBuffer || !audioContext) return;
+
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().then(() => {
+                    console.log("AudioContext resumed.");
+                    startPlayback(offset);
+                }).catch(err => {
+                    console.error("Error resuming context:", err);
+                    statusElement.textContent = "Error resuming audio.";
+                });
+                return;
+            }
+
+            stopPlayback();
+
+
+            if (!analyser || !analyserY || !splitterNode) {
+                console.warn("Analysis nodes missing, attempting to recreate...");
+                createAnalysisNodes();
+                if (!analyser || !analyserY || !splitterNode) {
+                    console.error("Failed to recreate analysis nodes. Cannot play.");
+                    statusElement.textContent = "Audio node error.";
+                    return;
+                }
+            }
+
+
+            bufferSource = audioContext.createBufferSource();
+            bufferSource.buffer = decodedAudioBuffer;
+            bufferSource.loop = false;
+
+
+            try {
+
+                bufferSource.connect(audioContext.destination);
+                bufferSource.connect(splitterNode);
+            } catch (e) {
+                console.error("Error connecting buffer source:", e);
+                statusElement.textContent = "Audio connection error.";
+                bufferSource = null;
+                return;
+            }
+
+
+            startOffset = Math.max(0, Math.min(offset, decodedAudioBuffer.duration));
+            startTime = audioContext.currentTime;
+
+
+            bufferSource.onended = () => {
+
+                if (!bufferSource || bufferSource.onended !== arguments.callee) return;
+
+                console.log("Playback ended naturally.");
+                isPlaying = false;
+
+                bufferSource = null;
+                updateTimeDisplay();
+                if (playButton) playButton.style.display = 'block';
+            };
+
+            try {
+                bufferSource.start(0, startOffset);
+                isPlaying = true;
+                isAudioReadyToPlay = false;
+                if (playButton) playButton.style.display = 'none';
+                statusElement.textContent = `Playing: ${fileInput?.files[0]?.name || (presetTracks.find(t => t.url === currentUrl)?.name) || 'audio'}`;
+                switchToVisualizer(currentVisualizerMode, true);
+                console.log(`Playback started at offset: ${startOffset.toFixed(2)}s`);
+                requestAnimationFrame(animate);
+            } catch (e) {
+                console.error("Error starting buffer source:", e);
+                statusElement.textContent = "Error starting playback.";
+                isPlaying = false;
+                bufferSource = null;
+            }
+        }
+
+
+        function setupSphereVisualizer() {
+            if (!analyser) { console.error("Sphere Setup: Analyser not ready."); return; }
+
+            analyser.fftSize = FFT_SIZE;
+            analyser.smoothingTimeConstant = SPHERE_ANALYSER_SMOOTHING;
+            const bufferLength = analyser.frequencyBinCount;
+
+            if (!frequencyData || frequencyData.length !== bufferLength) {
+                frequencyData = new Uint8Array(bufferLength);
+            }
+            console.log(`Sphere setup: Detail=${SPHERE_POINT_DETAIL}, Lines=${SPHERE_DRAW_LINES}, FFT=${analyser.fftSize}, Bins=${bufferLength}`);
+
+            cleanupVisualizerObjects();
+
+            const sphereGeo = new THREE.SphereGeometry(SPHERE_RADIUS, SPHERE_POINT_DETAIL * 2, SPHERE_POINT_DETAIL);
+            originalPositions = Float32Array.from(sphereGeo.attributes.position.array);
+
+
+            if (SPHERE_DRAW_LINES) {
+                const wireframeGeo = new THREE.WireframeGeometry(sphereGeo);
+                const lineMaterial = new THREE.LineBasicMaterial({ color: SPHERE_POINT_COLOR, linewidth: 1 });
+                sphereVisualObject = new THREE.LineSegments(wireframeGeo, lineMaterial);
+            } else {
+                const pointMaterial = new THREE.PointsMaterial({ color: SPHERE_POINT_COLOR, size: SPHERE_POINT_SIZE, sizeAttenuation: true });
+                sphereVisualObject = new THREE.Points(sphereGeo, pointMaterial);
+            }
+
+            scene.add(sphereVisualObject);
+            activeVisualizerObjects = [sphereVisualObject];
+
+
+            activeCamera.position.set(0, 0, SPHERE_RADIUS * 3);
+            if (activeCamera.isOrthographicCamera) {
+                activeCamera.zoom = 1.5 / (SPHERE_RADIUS / 5);
+                activeCamera.updateProjectionMatrix();
+            }
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+        function setupOscilloscopeVisualizer() {
+            if (!analyser) { console.error("Oscilloscope Setup: Analyser not ready."); return; }
+
+            analyser.fftSize = FFT_SIZE;
+            analyser.smoothingTimeConstant = OSC_ANALYSER_SMOOTHING;
+            const bufferLength = analyser.fftSize;
+
+            if (!timeData || timeData.length !== bufferLength) {
+                timeData = new Uint8Array(bufferLength);
+            }
+            console.log(`Oscilloscope setup: FFT=${analyser.fftSize}, BufferLen=${bufferLength}`);
+
+            cleanupVisualizerObjects();
+
+            const colors = [0x00ff00];
+            oscilloscopeLines = [];
+
+            for (let i = 0; i < OSC_LINE_COUNT; i++) {
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(bufferLength * 3);
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+                geometry.setDrawRange(0, bufferLength);
+
+                const material = new THREE.LineBasicMaterial({ color: colors[i % colors.length] });
+                const line = new THREE.Line(geometry, material);
+                scene.add(line);
+                oscilloscopeLines.push(line);
+            }
+            activeVisualizerObjects = [...oscilloscopeLines];
+
+            activeCamera.position.set(0, 0, 15);
+             if (activeCamera.isOrthographicCamera) {
+                 activeCamera.zoom = 1;
+                 activeCamera.updateProjectionMatrix();
+             }
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+        function setupXYScopeVisualizer() {
+             if (!analyser || !analyserY) { console.error("XY Scope Setup: Analysers not ready."); return; }
+
+             analyser.fftSize = OSC_XY_FFT_SIZE;
+             analyser.smoothingTimeConstant = OSC_XY_ANALYSER_SMOOTHING;
+             analyserY.fftSize = OSC_XY_FFT_SIZE;
+             analyserY.smoothingTimeConstant = OSC_XY_ANALYSER_SMOOTHING;
+             const bufferLength = analyser.fftSize;
+             if (!timeData || timeData.length !== bufferLength) {
+                 timeData = new Uint8Array(bufferLength);
+             }
+             if (!timeDataY || timeDataY.length !== bufferLength) {
+                 timeDataY = new Uint8Array(bufferLength);
+             }
+             console.log(`XY Scope setup: FFT=${analyser.fftSize}, BufferLen=${bufferLength}`);
+
+             cleanupVisualizerObjects();
+
+             if (lengthSlider) lengthSlider.max = bufferLength;
+             OSC_XY_LENGTH = Math.min(parseInt(lengthSlider?.value || OSC_XY_LENGTH, 10), bufferLength);
+             if (lengthSlider) lengthSlider.value = OSC_XY_LENGTH;
+             if (lengthValueSpan) lengthValueSpan.textContent = OSC_XY_LENGTH;
+
+
+             const geometry = new THREE.BufferGeometry();
+             const positions = new Float32Array(bufferLength * 3);
+             geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+             geometry.setDrawRange(0, OSC_XY_LENGTH);
+
+             const material = new THREE.LineBasicMaterial({ color: new THREE.Color(OSC_XY_COLOR) });
+             xyScopeLine = new THREE.Line(geometry, material);
+             scene.add(xyScopeLine);
+             activeVisualizerObjects = [xyScopeLine];
+
+
+             activeCamera.position.set(0, 0, 25);
+             if (activeCamera.isOrthographicCamera) {
+                 activeCamera.zoom = 0.8;
+                 activeCamera.updateProjectionMatrix();
+             }
+             controls.target.set(0, 0, 0);
+             controls.update();
+
+             console.log(`setupXYScopeVisualizer: Created line. Max points: ${bufferLength}, Current length: ${OSC_XY_LENGTH}.`);
+
+             if (scaleSlider) scaleSlider.value = OSC_XY_SCALE;
+             if (scaleValueSpan) scaleValueSpan.textContent = OSC_XY_SCALE.toFixed(1);
+             if (smoothingSlider) smoothingSlider.value = OSC_XY_ANALYSER_SMOOTHING;
+             if (smoothingValueSpan) smoothingValueSpan.textContent = OSC_XY_ANALYSER_SMOOTHING.toFixed(2);
+             if (lineColorInput) lineColorInput.value = OSC_XY_COLOR;
+         }
+        function updateSphereVisualizer() {
+             if (!analyser || !sphereVisualObject || !originalPositions || !frequencyData || !isPlaying) return;
+
+             try {
+                 analyser.getByteFrequencyData(frequencyData);
+             } catch (e) {
+                console.warn("getByteFrequencyData error:", e);
+                return;
+            }
+
+             const geometry = sphereVisualObject.geometry;
+             if (!geometry || !geometry.attributes.position) return;
+
+             const positions = geometry.attributes.position.array;
+             const numOriginalVerts = originalPositions.length / 3;
+             const frequencyBinCount = frequencyData.length;
+             if (frequencyBinCount === 0) return;
+
+             const numTargetVerts = positions.length / 3;
+             const isLines = sphereVisualObject.type === 'LineSegments';
+
+             const count = isLines ? Math.min(numTargetVerts, numOriginalVerts) : numOriginalVerts;
+
+             for (let i = 0; i < count; i++) {
+                 const i3 = i * 3;
+
+                 const freqIndex = i % frequencyBinCount;
+                 const frequencyValue = frequencyData[freqIndex] / 255.0;
+
+                 const displacement = frequencyValue * MAX_SPHERE_DISPLACEMENT;
+
+                 const ox = originalPositions[i3];
+                 const oy = originalPositions[i3 + 1];
+                 const oz = originalPositions[i3 + 2];
+                 const normal = new THREE.Vector3(ox, oy, oz).normalize();
+
+
+                 const newRadius = SPHERE_RADIUS + displacement;
+                 positions[i3] = normal.x * newRadius;
+                 positions[i3 + 1] = normal.y * newRadius;
+                 positions[i3 + 2] = normal.z * newRadius;
+             }
+
+             geometry.attributes.position.needsUpdate = true;
+
+
+         }
+
+        function updateOscilloscopeVisualizer() {
+             if (!analyser || oscilloscopeLines.length === 0 || !timeData || !isPlaying) return;
+
+             const bufferLength = analyser.fftSize;
+             if (bufferLength === 0) return;
+
+             try {
+                 analyser.getByteTimeDomainData(timeData);
+             } catch(e) {
+                console.warn("getByteTimeDomainData error (Osc):", e);
+                return;
+             }
+
+             const sliceWidth = OSC_WIDTH_SCALE / bufferLength;
+
+             oscilloscopeLines.forEach(line => {
+                 const positions = line.geometry.attributes.position.array;
+                 if (positions.length !== bufferLength * 3) {
+                      console.warn(`Oscilloscope buffer size mismatch. Expected ${bufferLength*3}, got ${positions.length}. Recreating buffer.`);
+                      line.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(bufferLength * 3), 3));
+                      line.geometry.setDrawRange(0, bufferLength);
+
+                 }
+
+                 for (let i = 0; i < bufferLength; i++) {
+                     const i3 = i * 3;
+
+                     const x = (i * sliceWidth) - (OSC_WIDTH_SCALE / 2);
+
+                     const v = timeData[i] / 128.0;
+                     const y = (v - 1.0) * OSC_HEIGHT_SCALE;
+
+                     positions[i3] = x;
+                     positions[i3 + 1] = y;
+                     positions[i3 + 2] = 0;
+                 }
+                 line.geometry.attributes.position.needsUpdate = true;
+             });
+         }
+
+        function updateXYScopeVisualizer() {
+             if (!analyser || !analyserY || !xyScopeLine || !timeData || !timeDataY || !isPlaying) return;
+
+             const bufferLength = analyser.fftSize;
+             if (bufferLength === 0) return;
+
+             if (timeData.length !== bufferLength || timeDataY.length !== bufferLength) {
+                 console.warn("XY Scope buffer length mismatch. Re-running setup.");
+                 switchToVisualizer('xyScope', true);
+                 return;
+             }
+
+             try {
+                 analyser.getByteTimeDomainData(timeData);
+                 analyserY.getByteTimeDomainData(timeDataY);
+             } catch (e) {
+                 console.warn("getByteTimeDomainData error (XY):", e);
+                 return;
+             }
+
+             const positions = xyScopeLine.geometry.attributes.position.array;
+
+             if (positions.length !== bufferLength * 3) {
+                 console.warn(`XY Scope buffer size mismatch. Expected ${bufferLength*3}, got ${positions.length}. Recreating buffer.`);
+                 xyScopeLine.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(bufferLength * 3), 3));
+
+             }
+
+             for (let i = 0; i < bufferLength; i++) {
+                 const i3 = i * 3;
+
+                 const xNorm = (timeData[i] / 128.0) - 1.0;
+                 const yNorm = (timeDataY[i] / 128.0) - 1.0;
+
+                 positions[i3] = xNorm * OSC_XY_SCALE;
+                 positions[i3 + 1] = yNorm * OSC_XY_SCALE;
+                 positions[i3 + 2] = 0;
+             }
+
+             if (xyScopeLine.geometry.drawRange.count !== OSC_XY_LENGTH) {
+                 xyScopeLine.geometry.setDrawRange(0, OSC_XY_LENGTH);
+             }
+
+             xyScopeLine.geometry.attributes.position.needsUpdate = true;
+         }
+
+
+         function cleanupVisualizerObjects() {
+            activeVisualizerObjects.forEach(obj => {
+                if(obj) {
+                    scene.remove(obj);
+                    if (obj.geometry) obj.geometry.dispose();
+                    if (obj.material) {
+
+                        if (obj.material.map) obj.material.map.dispose();
+                        obj.material.dispose();
+                    }
+                }
+            });
+            activeVisualizerObjects = [];
+            sphereVisualObject = null;
+            oscilloscopeLines = [];
+            xyScopeLine = null;
+        }
+
+
+        function switchToVisualizer(newMode, forceSetup = false) {
+            if (!forceSetup && newMode === currentVisualizerMode) return;
+
+            console.log(`Switching visualizer mode to: ${newMode}${forceSetup ? ' (forced setup)' : ''}`);
+
+            const showSphereSettings = newMode === 'sphere';
+            const showXYScopeSettings = newMode === 'xyScope';
+
+            const showXYScopeWarningHint = newMode === 'xyScope';
+
+
+
+
+
+            if (sphereSettingsSection) sphereSettingsSection.style.display = showSphereSettings ? 'block' : 'none';
+            if (xyScopeSettingsSection) xyScopeSettingsSection.style.display = showXYScopeSettings ? 'block' : 'none';
+
+            if (settingsButton) settingsButton.style.display = (showSphereSettings || showXYScopeSettings) ? 'block' : 'none';
+
+
+            if (oscilloscopeWarningHint) {
+                if (oscilloscopeWarningTimeout) {
+                    clearTimeout(oscilloscopeWarningTimeout);
+                    oscilloscopeWarningTimeout = null;
+                }
+                oscilloscopeWarningHint.classList.remove('visible');
+
+
+                if (showXYScopeWarningHint) {
+
+                    oscilloscopeWarningHint.classList.add('visible');
+
+                    oscilloscopeWarningTimeout = setTimeout(() => {
+                        oscilloscopeWarningHint.classList.remove('visible');
+                        oscilloscopeWarningTimeout = null;
+                    }, 4000);
+                }
+            }
+
+
+            const oldMode = currentVisualizerMode;
+            currentVisualizerMode = newMode;
+
+
+            let setupFunction = null;
+            switch (newMode) {
+                case 'sphere':       setupFunction = setupSphereVisualizer; break;
+                case 'oscilloscope': setupFunction = setupOscilloscopeVisualizer; break;
+                case 'xyScope':      setupFunction = setupXYScopeVisualizer; break;
+                default:
+                    console.warn(`Unknown visualizer mode requested: ${newMode}. Reverting to ${oldMode}.`);
+                    currentVisualizerMode = oldMode;
+                    return;
+            }
+
+
+            if (setupFunction) {
+
+                const analysersReady = (newMode === 'xyScope') ? (analyser && analyserY) : (analyser);
+                if (analysersReady) {
+                    setupFunction();
+                } else {
+
+                    console.log(`switchToVisualizer: Analysers not ready for ${newMode}. Setup deferred.`);
+
+                }
+            }
+
+
+            if (menuButtons) {
+                menuButtons.forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.mode === currentVisualizerMode);
+
+                });
+            }
+        }
+
+
+        function setCameraView(mode) {
+            if (mode === CAMERA_VIEW_MODE || !controls || !renderPass) return;
+
+            CAMERA_VIEW_MODE = mode;
+            console.log(`Switching camera to: ${CAMERA_VIEW_MODE}`);
+
+
+            const target = new THREE.Vector3();
+            controls.getTarget(target);
+            const position = new THREE.Vector3();
+            activeCamera.getWorldPosition(position);
+
+            if (orthoHintTimeout) clearTimeout(orthoHintTimeout);
+            orthoHintTimeout = null;
+            if (orthoHint) orthoHint.classList.remove('visible');
+
+            if (CAMERA_VIEW_MODE === 'orthographic') {
+                activeCamera = orthoCamera;
+
+                const distance = position.distanceTo(target);
+                const perspectiveFOV = camera.fov * THREE.MathUtils.DEG2RAD;
+                const orthoHeight = distance * 2 * Math.tan(perspectiveFOV / 2);
+                const aspect = window.innerWidth / window.innerHeight;
+
+                orthoCamera.left = orthoHeight * aspect / -2;
+                orthoCamera.right = orthoHeight * aspect / 2;
+                orthoCamera.top = orthoHeight / 2;
+                orthoCamera.bottom = orthoHeight / -2;
+                orthoCamera.zoom = 1;
+
+                if (orthoHint) {
+                    orthoHint.classList.add('visible');
+                    orthoHintTimeout = setTimeout(() => {
+                        orthoHint.classList.remove('visible');
+                        orthoHintTimeout = null;
+                    }, 3500);
+                }
+            } else {
+                activeCamera = camera;
+            }
+
+            activeCamera.position.copy(position);
+            activeCamera.lookAt(target);
+            activeCamera.updateProjectionMatrix();
+
+            controls.object = activeCamera;
+            renderPass.camera = activeCamera;
+            controls.update();
+
+            if (cameraViewSelect) cameraViewSelect.value = CAMERA_VIEW_MODE;
+        }
+
+        function generateWaveformData(buffer) {
+            if (!buffer || !waveformCanvas) return;
+
+
+            if (waveformCanvas.width === 0 || waveformCanvas.height === 0) {
+                console.warn("Waveform canvas size is zero, deferring generation.");
+                requestAnimationFrame(() => generateWaveformData(buffer));
+                return;
+            }
+
+            waveformCtx = waveformCanvas.getContext('2d');
+            const width = waveformCanvas.width;
+            const height = waveformCanvas.height;
+            const channelData = buffer.getChannelData(0);
+            const totalSamples = channelData.length;
+            const samplesPerPixel = Math.floor(totalSamples / width);
+            waveformData = [];
+
+             if (samplesPerPixel < 1) {
+                 console.warn("Audio too short for detailed waveform at this canvas width.");
+
+                 for (let x = 0; x < width; x++) {
+                     const sampleIndex = Math.floor(x * totalSamples / width);
+                     const sample = channelData[sampleIndex] || 0;
+                     waveformData.push([sample * 0.9, sample * 0.9]);
+                 }
+
+             } else {
+                for (let x = 0; x < width; x++) {
+                    const start = x * samplesPerPixel;
+
+                    const end = Math.min(start + samplesPerPixel, totalSamples);
+                    let min = 1.0;
+                    let max = -1.0;
+
+
+                    for (let i = start; i < end; i++) {
+                        const s = channelData[i];
+                        if (s < min) min = s;
+                        if (s > max) max = s;
+                    }
+
+                    waveformData.push([min * 0.9, max * 0.9]);
+                }
+             }
+
+
+            console.log(`Waveform data generated (${waveformData.length} points).`);
+            drawWaveform();
+        }
+
+
+        function drawWaveform(currentTime = 0) {
+            if (!waveformCtx || !waveformData || !decodedAudioBuffer || waveformCanvas.width === 0) return;
+
+            const width = waveformCanvas.width;
+            const height = waveformCanvas.height;
+            const duration = decodedAudioBuffer.duration;
+
+
+            if (isPlaying && Math.abs(currentTime - lastDrawTime) < 0.05 && lastDrawTime >= 0) {
+
+            }
+            lastDrawTime = isPlaying ? currentTime : -1;
+
+
+            waveformCtx.clearRect(0, 0, width, height);
+            waveformCtx.fillStyle = 'rgba(30, 30, 40, 0.7)';
+            waveformCtx.fillRect(0, 0, width, height);
+
+
+            waveformCtx.strokeStyle = 'rgba(180, 180, 200, 0.6)';
+            waveformCtx.lineWidth = 1;
+            waveformCtx.beginPath();
+
+            const halfHeight = height / 2;
+
+
+            for (let x = 0; x < waveformData.length; x++) {
+                const [min, max] = waveformData[x];
+
+                const yMin = (1 + min) * halfHeight;
+                const yMax = (1 + max) * halfHeight;
+                waveformCtx.moveTo(x + 0.5, yMin);
+                waveformCtx.lineTo(x + 0.5, yMax);
+            }
+            waveformCtx.stroke();
+
+
+            if (duration > 0 && (isPlaying || startOffset > 0)) {
+
+                let displayTime = startOffset;
+                 if(isPlaying && audioContext) {
+                    displayTime = (audioContext.currentTime - startTime) + startOffset;
+                 }
+                 displayTime = Math.max(0, Math.min(displayTime, duration));
+
+                const progress = displayTime / duration;
+                const playheadX = progress * width;
+
+
+                waveformCtx.strokeStyle = '#ff4444';
+                waveformCtx.lineWidth = 2;
+                waveformCtx.beginPath();
+                waveformCtx.moveTo(playheadX, 0);
+                waveformCtx.lineTo(playheadX, height);
+                waveformCtx.stroke();
+            }
+        }
+
+
+        function handleWaveformClick(event) {
+            if (!decodedAudioBuffer || !waveformCanvas || !audioContext) return;
+
+            const rect = waveformCanvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const width = waveformCanvas.width;
+            const progress = Math.max(0, Math.min(1, x / width));
+            const targetTime = progress * decodedAudioBuffer.duration;
+
+            console.log(`Waveform clicked. Target time: ${targetTime.toFixed(2)}s`);
+            startPlayback(targetTime);
+        }
+
+
+        function formatTime(totalSeconds) {
+            totalSeconds = Math.max(0, totalSeconds);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+
+            return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+
+        function updateTimeDisplay() {
+            if (!timeDisplay || !decodedAudioBuffer) return;
+
+            let currentTime = startOffset;
+            const totalDuration = decodedAudioBuffer.duration;
+
+
+            if (isPlaying && audioContext && bufferSource) {
+                currentTime = (audioContext.currentTime - startTime) + startOffset;
+
+                 currentTime = Math.max(0, Math.min(currentTime, totalDuration));
+            }
+
+            else if (!isPlaying && bufferSource === null && startOffset >= totalDuration - 0.1) {
+                 currentTime = totalDuration;
+            } else if (!isPlaying && startOffset === 0 && bufferSource === null) {
+                 currentTime = 0;
+            }
+
+
+
+            timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(totalDuration)}`;
+
+
+            drawWaveform(currentTime);
+        }
+
+
+        function animate() {
+             requestAnimationFrame(animate);
+
+
+             if (isPlaying && audioContext && audioContext.state === 'running') {
+                 switch (currentVisualizerMode) {
+                     case 'sphere':       updateSphereVisualizer(); break;
+                     case 'oscilloscope': updateOscilloscopeVisualizer(); break;
+                     case 'xyScope':      updateXYScopeVisualizer(); break;
+                 }
+             }
+
+
+             if (decodedAudioBuffer) {
+                 updateTimeDisplay();
+             }
+
+
+             if (controls) controls.update();
+
+
+             if (composer) {
+                 composer.render();
+             } else if (renderer && scene && activeCamera) {
+                 renderer.render(scene, activeCamera);
+             }
+         }
+
+
+        function onWindowResize() {
+            if (!camera || !orthoCamera || !renderer || !composer) return;
+
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const aspect = width / height;
+
+
+            camera.aspect = aspect;
+            camera.updateProjectionMatrix();
+
+
+            const currentOrthoHeight = orthoCamera.top - orthoCamera.bottom;
+            orthoCamera.left = currentOrthoHeight * aspect / -2;
+            orthoCamera.right = currentOrthoHeight * aspect / 2;
+
+
+            orthoCamera.updateProjectionMatrix();
+
+
+
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+
+
+            if (waveformCanvas) {
+                waveformCanvas.width = waveformCanvas.clientWidth;
+                waveformCanvas.height = waveformCanvas.clientHeight;
+                 if(decodedAudioBuffer) {
+
+
+                    drawWaveform(isPlaying ? (audioContext.currentTime - startTime + startOffset) : startOffset);
+                 }
+            }
+            console.log("Window resized.");
+        }
+
+
+        if (fileInput) {
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    statusElement.textContent = 'Loading...';
+                    const processLoad = () => {
+                        loadAndDecodeAudio(file)
+                            .then(() => {
+                                onWindowResize();
+                            })
+                            .catch(error => {
+                                statusElement.textContent = error.message || 'Failed load.';
+                                loadingElement.style.display = 'none';
+                            })
+                            .finally(() => {
+
+                                event.target.value = null;
+                            });
+                    };
+
+                    if (!audioContext || audioContext.state === 'closed') {
+                        if (!initAudioContext()) return;
+                    }
+
+
+                    if (audioContext.state === 'suspended') {
+                         audioContext.resume().then(processLoad).catch(err => {
+                            statusElement.textContent = "Failed context resume.";
+                            loadingElement.style.display = 'none';
+                        });
+                    } else {
+                        processLoad();
+                    }
+                }
+            });
+        } else { console.error("Could not find fileInput element."); }
+
+
+        if (playButton) {
+            playButton.addEventListener('click', () => {
+                if (!decodedAudioBuffer || !audioContext) return;
+
+
+                 const restartOffset = (isPlaying || startOffset === 0 || startOffset >= decodedAudioBuffer.duration - 0.1) ? 0 : startOffset;
+                 startPlayback(restartOffset);
+
+
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+            });
+        } else { console.error("Could not find playButton element."); }
+
+
+        if (menuButton) {
+            menuButton.addEventListener('click', () => {
+
+                const isVisible = visualizerMenu.style.display === 'block';
+                visualizerMenu.style.display = isVisible ? 'none' : 'block';
+                settingsPanel.style.display = 'none';
+                presetAudioPopup.style.display = 'none';
+            });
+        } else { console.error("Could not find menuButton element."); }
+
+
+        if (settingsButton) {
+            settingsButton.addEventListener('click', () => {
+
+                const isVisible = settingsPanel.style.display === 'block';
+                settingsPanel.style.display = isVisible ? 'none' : 'block';
+                visualizerMenu.style.display = 'none';
+                presetAudioPopup.style.display = 'none';
+            });
+        } else { console.error("Could not find settingsButton element."); }
+
+
+        const presetTracks = [
+            { name: "Oscilloscope Song", url: "https://maxi74x1.github.io/Oscilloscope%20Music%20-%20Function.mp3", hint: "Best in XY Scope" },
+            { name: "Smarter every day clip", url: "https://maxi74x1.github.io/Smarter%20every%20day%20clip.mp3", hint: "Best in XY Scope" },
+
+        ];
+        let currentUrl = '';
+
+        if (presetAudioButton && presetAudioPopup && presetAudioList && closePresetPopup) {
+            presetAudioButton.addEventListener('click', () => {
+                presetAudioList.innerHTML = "";
+                presetTracks.forEach(track => {
+                    const row = document.createElement('div');
+                    row.style.margin = '10px 0';
+                    row.style.display = 'flex';
+                    row.style.justifyContent = 'space-between';
+                    row.style.alignItems = 'center';
+                    row.style.gap = '10px';
+
+                    const titleContainer = document.createElement('div');
+                    titleContainer.style.flex = '1';
+                    titleContainer.style.textAlign = 'left';
+
+                    const title = document.createElement('span');
+                    title.textContent = track.name;
+                    title.style.display = 'block';
+
+                    const hint = document.createElement('small');
+                    hint.textContent = track.hint;
+                    hint.style.color = '#aaa';
+                    hint.style.fontSize = '0.8em';
+                    hint.style.display = 'block';
+
+                    titleContainer.appendChild(title);
+                    titleContainer.appendChild(hint);
+
+                    const btn = document.createElement('button');
+                    btn.textContent = "Load";
+                    btn.style.padding = '5px 10px';
+                    btn.style.background = '#333';
+                    btn.style.color = '#fff';
+                    btn.style.border = '1px solid #555';
+                    btn.style.borderRadius = '4px';
+                    btn.style.cursor = 'pointer';
+                    btn.style.flexShrink = '0';
+
+                    btn.onclick = () => {
+                         currentUrl = track.url;
+                         loadAndDecodeAudio(track.url)
+                           .then(() => {
+                                presetAudioPopup.style.display = 'none';
+                                loadingElement.style.display = 'none';
+                                console.log("Preset audio loaded:", track.name);
+
+                                if (track.hint.includes("XY Scope")) {
+                                    switchToVisualizer('xyScope');
+                                } else if (track.hint.includes("Sphere")) {
+                                     switchToVisualizer('sphere');
+                                }
+                           })
+                           .catch(err => {
+
+                                console.error("Preset load promise rejected:", err);
+
+                           });
+                    };
+
+                    row.appendChild(titleContainer);
+                    row.appendChild(btn);
+                    presetAudioList.appendChild(row);
+                });
+
+                presetAudioPopup.style.display = 'block';
+                visualizerMenu.style.display = 'none';
+                settingsPanel.style.display = 'none';
+            });
+
+            closePresetPopup.addEventListener('click', () => {
+                presetAudioPopup.style.display = 'none';
+            });
+
+        } else {
+            console.warn("Preset audio UI elements not found.");
+            if(presetAudioButton) presetAudioButton.disabled = true;
+        }
+
+
+
+        if (menuButtons.length > 0) {
+            menuButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    if (button.dataset.mode) {
+                        switchToVisualizer(button.dataset.mode);
+                        visualizerMenu.style.display = 'none';
+                    }
+                });
+            });
+        } else { console.warn("Could not find any visualizer menu buttons."); }
+
+
+
+        if (scaleSlider) scaleSlider.addEventListener('input', (event) => {
+            OSC_XY_SCALE = parseFloat(event.target.value);
+            if (scaleValueSpan) scaleValueSpan.textContent = OSC_XY_SCALE.toFixed(1);
+
+        });
+        if (smoothingSlider) smoothingSlider.addEventListener('input', (event) => {
+            const newSmoothing = parseFloat(event.target.value);
+            OSC_XY_ANALYSER_SMOOTHING = newSmoothing;
+            if (smoothingValueSpan) smoothingValueSpan.textContent = OSC_XY_ANALYSER_SMOOTHING.toFixed(2);
+
+            if (analyser && analyserY && currentVisualizerMode === 'xyScope') {
+                try {
+                    analyser.smoothingTimeConstant = OSC_XY_ANALYSER_SMOOTHING;
+                    analyserY.smoothingTimeConstant = OSC_XY_ANALYSER_SMOOTHING;
+                } catch (e) { console.warn("Error setting smoothing:", e)}
+            }
+        });
+        if (lengthSlider) lengthSlider.addEventListener('input', (event) => {
+             let requestedLength = parseInt(event.target.value, 10);
+             const maxPoints = analyser ? analyser.fftSize : OSC_XY_MAX_SLIDER_LENGTH;
+             OSC_XY_LENGTH = Math.min(requestedLength, maxPoints);
+
+             if (lengthValueSpan) lengthValueSpan.textContent = OSC_XY_LENGTH;
+
+             if (requestedLength !== OSC_XY_LENGTH) {
+                 lengthSlider.value = OSC_XY_LENGTH;
+             }
+
+             if (xyScopeLine && currentVisualizerMode === 'xyScope') {
+                try {
+                    xyScopeLine.geometry.setDrawRange(0, OSC_XY_LENGTH);
+                } catch (e) { console.error("Error setting draw range:", e); }
+            }
+        });
+        if (lineColorInput) lineColorInput.addEventListener('input', (event) => {
+            OSC_XY_COLOR = event.target.value;
+
+            if (xyScopeLine && currentVisualizerMode === 'xyScope' && xyScopeLine.material) {
+                try { xyScopeLine.material.color.set(OSC_XY_COLOR); }
+                catch (e) { console.warn("Error setting line color", e); }
+            }
+        });
+        if (sphereDetailSlider) sphereDetailSlider.addEventListener('input', (event) => {
+            SPHERE_POINT_DETAIL = parseInt(event.target.value, 10);
+            if (sphereDetailValue) sphereDetailValue.textContent = SPHERE_POINT_DETAIL;
+
+            if (currentVisualizerMode === 'sphere') switchToVisualizer('sphere', true);
+        });
+        if (sphereColorInput) sphereColorInput.addEventListener('input', (event) => {
+            SPHERE_POINT_COLOR = event.target.value;
+
+            if (sphereVisualObject && sphereVisualObject.material && currentVisualizerMode === 'sphere') {
+                 try { sphereVisualObject.material.color.set(SPHERE_POINT_COLOR); }
+                 catch(e) { console.warn("Error setting sphere color", e); }
+            }
+        });
+        if (sphereLinesToggle) sphereLinesToggle.addEventListener('change', (event) => {
+            SPHERE_DRAW_LINES = event.target.checked;
+
+            if (currentVisualizerMode === 'sphere') switchToVisualizer('sphere', true);
+        });
+        if (cameraViewSelect) cameraViewSelect.addEventListener('change', (event) => {
+            setCameraView(event.target.value);
+        });
+        if (bloomToggle) bloomToggle.addEventListener('change', (event) => {
+            bloomParams.enabled = event.target.checked;
+            if (bloomPass) bloomPass.enabled = bloomParams.enabled;
+        });
+        if (bloomStrengthSlider) bloomStrengthSlider.addEventListener('input', (event) => {
+            bloomParams.strength = parseFloat(event.target.value);
+            if (bloomPass) bloomPass.strength = bloomParams.strength;
+            if(bloomStrengthValue) bloomStrengthValue.textContent = bloomParams.strength.toFixed(2);
+        });
+        if (bloomRadiusSlider) bloomRadiusSlider.addEventListener('input', (event) => {
+            bloomParams.radius = parseFloat(event.target.value);
+            if (bloomPass) bloomPass.radius = bloomParams.radius;
+            if(bloomRadiusValue) bloomRadiusValue.textContent = bloomParams.radius.toFixed(2);
+        });
+        if (bloomThresholdSlider) bloomThresholdSlider.addEventListener('input', (event) => {
+            bloomParams.threshold = parseFloat(event.target.value);
+            if (bloomPass) bloomPass.threshold = bloomParams.threshold;
+            if(bloomThresholdValue) bloomThresholdValue.textContent = bloomParams.threshold.toFixed(2);
+        });
+        if (smaaToggle) smaaToggle.addEventListener('change', (event) => {
+            smaaEnabled = event.target.checked;
+            if (smaaPass) smaaPass.enabled = smaaEnabled;
+        });
+
+
+        document.addEventListener('click', (event) => {
+
+            if (visualizerMenu && visualizerMenu.style.display === 'block' && !visualizerMenu.contains(event.target) && event.target !== menuButton) {
+                visualizerMenu.style.display = 'none';
+            }
+
+            if (settingsPanel && settingsPanel.style.display === 'block' && !settingsPanel.contains(event.target) && event.target !== settingsButton) {
+                settingsPanel.style.display = 'none';
+            }
+
+             if (presetAudioPopup && presetAudioPopup.style.display === 'block' && !presetAudioPopup.contains(event.target) && event.target !== presetAudioButton) {
+                 presetAudioPopup.style.display = 'none';
+             }
+        });
+
+
+        if (waveformCanvas) {
+            waveformCanvas.addEventListener('click', handleWaveformClick);
+
+            waveformCanvas.addEventListener('mouseenter', () => {
+                if (!waveformHintDismissed) {
+                    waveformHintDismissed = true;
+                    if (waveformHint) {
+                        waveformHint.style.opacity = '0';
+
+                        setTimeout(() => { waveformHint.style.display = 'none'; }, 500);
+                    }
+                }
+            });
+        } else { console.error("Could not find waveformCanvas."); }
+
+
+        window.addEventListener('mousemove', (event) => {
+            if (!controlsContainer) return;
+            const mouseY = event.clientY;
+            const windowHeight = window.innerHeight;
+
+            const threshold = windowHeight - Math.max(windowHeight * 0.15, 85);
+
+            if (mouseY > threshold) {
+                if (!isControlsVisible) {
+                    controlsContainer.classList.add('visible');
+                    if (waveformHint && !waveformHintDismissed) waveformHint.style.opacity = '0';
+                    isControlsVisible = true;
+                }
+            } else {
+                if (isControlsVisible) {
+                    controlsContainer.classList.remove('visible');
+
+                    if (waveformHint && !waveformHintDismissed && !decodedAudioBuffer) {
+                        waveformHint.style.opacity = '1';
+                    }
+                    isControlsVisible = false;
+                }
+            }
+        });
+
+
+        window.addEventListener('mouseleave', () => {
+            if (uiFadeTimeout) clearTimeout(uiFadeTimeout);
+
+            uiFadeTimeout = setTimeout(() => {
+                document.body.classList.add('ui-hidden');
+
+
+                if (visualizerMenu) visualizerMenu.style.display = 'none';
+                if (settingsPanel) settingsPanel.style.display = 'none';
+                if (presetAudioPopup) presetAudioPopup.style.display = 'none';
+                 if (isControlsVisible) {
+                     controlsContainer.classList.remove('visible');
+                     isControlsVisible = false;
+                 }
+                uiFadeTimeout = null;
+            }, 2000);
+        });
+        window.addEventListener('mouseenter', () => {
+             if (uiFadeTimeout) {
+                 clearTimeout(uiFadeTimeout);
+                 uiFadeTimeout = null;
+
+             }
+
+             if(document.body.classList.contains('ui-hidden')) {
+                 document.body.classList.remove('ui-hidden');
+
+             }
+        });
+
+        window.addEventListener('mouseleave', () => {
+            if (isControlsVisible) {
+                 controlsContainer.classList.remove('visible');
+                 if (waveformHint && !waveformHintDismissed && !decodedAudioBuffer) waveformHint.style.opacity = '1';
+                 isControlsVisible = false;
+             }
+         });
+
+
+        window.addEventListener('blur', () => {
+            document.body.classList.add('ui-hidden');
+
+            if (visualizerMenu) visualizerMenu.style.display = 'none';
+            if (settingsPanel) settingsPanel.style.display = 'none';
+            if (presetAudioPopup) presetAudioPopup.style.display = 'none';
+             if (isControlsVisible) {
+                 controlsContainer.classList.remove('visible');
+                 isControlsVisible = false;
+             }
+            console.log("Window lost focus - UI hidden");
+        });
+        window.addEventListener('focus', () => {
+            document.body.classList.remove('ui-hidden');
+            console.log("Window regained focus - UI shown");
+        });
+
+
+
+        function initUI() {
+
+             if (menuButtons) menuButtons.forEach(btn => { btn.classList.toggle('active', btn.dataset.mode === currentVisualizerMode); });
+
+
+             if (scaleSlider) scaleSlider.value = OSC_XY_SCALE; if (scaleValueSpan) scaleValueSpan.textContent = OSC_XY_SCALE.toFixed(1);
+             if (smoothingSlider) smoothingSlider.value = OSC_XY_ANALYSER_SMOOTHING; if (smoothingValueSpan) smoothingValueSpan.textContent = OSC_XY_ANALYSER_SMOOTHING.toFixed(2);
+             if (lengthSlider) lengthSlider.max = OSC_XY_MAX_SLIDER_LENGTH;
+             if (lengthSlider) lengthSlider.value = OSC_XY_LENGTH; if (lengthValueSpan) lengthValueSpan.textContent = OSC_XY_LENGTH;
+             if (lineColorInput) lineColorInput.value = OSC_XY_COLOR;
+             if (sphereDetailSlider) sphereDetailSlider.value = SPHERE_POINT_DETAIL; if (sphereDetailValue) sphereDetailValue.textContent = SPHERE_POINT_DETAIL;
+             if (sphereColorInput) sphereColorInput.value = SPHERE_POINT_COLOR;
+             if (sphereLinesToggle) sphereLinesToggle.checked = SPHERE_DRAW_LINES;
+             if (cameraViewSelect) cameraViewSelect.value = CAMERA_VIEW_MODE;
+             if (bloomToggle) bloomToggle.checked = bloomParams.enabled;
+             if (bloomStrengthSlider) bloomStrengthSlider.value = bloomParams.strength; if (bloomStrengthValue) bloomStrengthValue.textContent = bloomParams.strength.toFixed(2);
+             if (bloomRadiusSlider) bloomRadiusSlider.value = bloomParams.radius; if (bloomRadiusValue) bloomRadiusValue.textContent = bloomParams.radius.toFixed(2);
+             if (bloomThresholdSlider) bloomThresholdSlider.value = bloomParams.threshold; if (bloomThresholdValue) bloomThresholdValue.textContent = bloomParams.threshold.toFixed(2);
+             if (smaaToggle) smaaToggle.checked = smaaEnabled;
+
+
+             const showSphereSettings = currentVisualizerMode === 'sphere';
+             const showXYScopeSettings = currentVisualizerMode === 'xyScope';
+             if (settingsButton) settingsButton.style.display = (showSphereSettings || showXYScopeSettings) ? 'block' : 'none';
+             if (sphereSettingsSection) sphereSettingsSection.style.display = showSphereSettings ? 'block' : 'none';
+             if (xyScopeSettingsSection) xyScopeSettingsSection.style.display = showXYScopeSettings ? 'block' : 'none';
+
+
+             if (orthoHint) orthoHint.classList.remove('visible');
+             if (oscilloscopeWarningHint) oscilloscopeWarningHint.classList.remove('visible');
+
+
+             if (autoHideHint) { setTimeout(() => { autoHideHint.classList.add('fade-out'); }, 8000); }
+
+
+             if (visualizerMenu) visualizerMenu.style.display = 'none';
+             if (settingsPanel) settingsPanel.style.display = 'none';
+             if (presetAudioPopup) presetAudioPopup.style.display = 'none';
+        }
+
+
+        try {
+            init3D();
+            initAudioContext();
+            initUI();
+            onWindowResize();
+            switchToVisualizer(currentVisualizerMode, true);
+            animate();
+        } catch (error) {
+            console.error("Fatal error during initialization:", error);
+            document.body.innerHTML = `<div style="padding: 20px; color: red; font-family: sans-serif;">
+                <h2>Initialization Error</h2>
+                <p>Failed to start the visualizer. This might be due to:</p>
+                <ul>
+                    <li>Browser not supporting WebGL or Web Audio API.</li>
+                    <li>Issues with graphics drivers.</li>
+                    <li>Post-processing effects requiring specific GPU features.</li>
+                </ul>
+                <p>Please check the browser console (Press F12) for more details.</p>
+                <p>Try updating your browser or graphics drivers.</p>
+                <pre style="color: #ff8888; background: #333; padding: 10px; border-radius: 4px; white-space: pre-wrap;">${error.stack || error}</pre>
+            </div>`;
+        }
+
+window.addEventListener('blur', () => {
+    document.body.classList.add('ui-hidden');
+    console.log("Window lost focus - UI hidden");
+});
+
+window.addEventListener('focus', () => {
+    document.body.classList.remove('ui-hidden');
+    console.log("Window regained focus - UI shown");
+});
+
+    </script>
+
+</body>
+</html>
